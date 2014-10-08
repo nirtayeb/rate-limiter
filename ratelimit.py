@@ -1,14 +1,15 @@
 #!/usr/bin/env python
 import redis
-
+import functools
 g_redis = redis.StrictRedis(db = 0)
 
 class RateLimitType:
-    def __init__(self, name, times, expire, get_data_func=lambda h: None):
+    def __init__(self, name, times, expire, get_data_func=lambda h: None, on_exceed = lambda h: None):
         self.name = name
         self.times = times
         self.expire_at = expire
         self.get_data_func = get_data_func
+        self.on_exceed = exceed
 
     def server_name(self, request):
             return "l_%s:%s" % (self.name, self.get_data_func(request))
@@ -28,7 +29,7 @@ class RateLimitType:
 
 
 class AndRateLimitType(RateLimitType):
-    def __init__(self, first, other):
+    def __init__(self, first, other, exceed = lambda h: None):
         name = "%s & %s" % (first.name, other.name)
         times = min(first.times, other.times)
         expire_at = min(first.expire_at, other.expire_at)
@@ -51,16 +52,14 @@ class OrRateLimitType(RateLimitType):
     def server_name(self, request):
         return "(%s)|(%s)" % (self.first.server_name(request), self.other.server_name(request))
 
-def limit_exceed(handler):
-    handler.set_status(403)
-    handler.write("Limits exceed")
-
 def limit_by(limiter):
     def rate_limiter_decorator(func):
+        @functools.wraps(func)
         def func_wrapper(self, *args, **kargs):
+            print len(args), len(kargs)
             if not limiter.check(self):
                 limiter.change(self)
                 return func(self, *args, **kargs)
-            limit_exceed(handler)
+            limiter.on_exceed(handler)
         return func_wrapper
     return rate_limiter_decorator
