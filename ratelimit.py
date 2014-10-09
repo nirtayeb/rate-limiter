@@ -16,7 +16,6 @@ class RateLimitType:
 
     def check(self, request):
         times = g_redis.get(self.server_name(request))
-        print "rule",self.times, "db", times
         return times != None and int(times) > self.times
     
     def change(self, request):
