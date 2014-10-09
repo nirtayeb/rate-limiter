@@ -9,7 +9,7 @@ class RateLimitType:
         self.times = times
         self.expire_at = expire
         self.get_data_func = get_data_func
-        self.on_exceed = exceed
+        self.on_exceed = on_exceed
 
     def server_name(self, request):
             return "l_%s:%s" % (self.name, self.get_data_func(request))
@@ -29,11 +29,11 @@ class RateLimitType:
 
 
 class AndRateLimitType(RateLimitType):
-    def __init__(self, first, other, exceed = lambda h: None):
+    def __init__(self, first, other, on_exceed = lambda h: None):
         name = "%s & %s" % (first.name, other.name)
         times = min(first.times, other.times)
         expire_at = min(first.expire_at, other.expire_at)
-        RateLimitType.__init__(self, name, times, expire_at)
+        RateLimitType.__init__(self, name, times, expire_at, on_exceed=on_exceed)
         self.first = first
         self.other = other
         
@@ -60,6 +60,6 @@ def limit_by(limiter):
             if not limiter.check(self):
                 limiter.change(self)
                 return func(self, *args, **kargs)
-            limiter.on_exceed(handler)
+            limiter.on_exceed(self)
         return func_wrapper
     return rate_limiter_decorator
